@@ -16,6 +16,8 @@ import { toast } from "sonner";
 
 export function CardWithForm() {
   const [audioFile, setAudioFile] = React.useState(null);
+  const [transcription, setTranscription] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
   const inputRef = React.useRef(null);
 
   const handleFileChange = (e) => {
@@ -39,30 +41,50 @@ export function CardWithForm() {
 
   const handleClearFile = () => {
     setAudioFile(null);
+    setTranscription("");
     if (inputRef.current) {
       inputRef.current.value = "";
-      toast.success("File cleared");
     }
+    toast.success("File cleared");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!audioFile) {
       toast.warning("Please select a file first.");
       return;
     }
+    const formData = new FormData();
+    formData.append("file", audioFile);
 
-    console.log("Uploading:", audioFile);
-    toast("Uploading started", {
+    setTranscription("");
+    setLoading(true);
+
+    toast("Streaming transcription started", {
       description: audioFile.name,
-      action: {
-        label: "Cancel",
-        onClick: () => {
-          setAudioFile(null);
-          toast.info("Upload cancelled");
-        },
-      },
     });
+    try {
+      const res = await fetch(Constants.API_URL, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Server error");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        setTranscription((prev) => prev + chunk);
+      }
+      toast.success("Transcription completed");
+    } catch (error) {
+      toast.error("Transcription failed", {
+        description: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -84,10 +106,21 @@ export function CardWithForm() {
             />
 
             <div className="flex justify-between">
-              <Button onClick={handleClearFile} type="button" variant="outline">
+              <Button
+                className={"cursor-pointer"}
+                onClick={handleClearFile}
+                type="button"
+                variant="outline"
+              >
                 Cancel
               </Button>
-              <Button type="submit">Upload</Button>
+              <Button
+                className={"cursor-pointer"}
+                type="submit"
+                disabled={loading}
+              >
+                {loading ? "Streaming..." : "Upload & Stream"}
+              </Button>
             </div>
           </div>
         </form>
@@ -97,8 +130,7 @@ export function CardWithForm() {
       <CardContent>
         <p className="text-center font-medium mb-2">Your Transcription</p>
         <div className="min-h-[100px] p-4 border rounded-md bg-gray-50 text-gray-900 overflow-auto">
-          {/* Transcription text will appear here */}
-          <em>No transcription yet.</em>
+          {transcription || <em>No transcription yet.</em>}
         </div>
       </CardContent>
     </Card>
