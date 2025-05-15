@@ -11,8 +11,60 @@ import {
 } from "@/components/ui/card";
 import { InputFile } from "./InputFile";
 import { Separator } from "./ui/separator";
+import { Constants } from "@/constant/Constants";
+import { toast } from "sonner";
 
 export function CardWithForm() {
+  const [audioFile, setAudioFile] = React.useState(null);
+  const inputRef = React.useRef(null);
+
+  const handleFileChange = (e) => {
+    console.log("e files", e.target.files);
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      if (file.size > Constants.FILE_SIZE) {
+        toast.error("File too large", {
+          description: "File must be <= 10MB",
+        });
+        setAudioFile(null);
+        inputRef.current.value = "";
+      } else {
+        setAudioFile(file);
+        toast.success("File added successfully", {
+          description: file.name,
+        });
+      }
+    }
+  };
+
+  const handleClearFile = () => {
+    setAudioFile(null);
+    if (inputRef.current) {
+      inputRef.current.value = "";
+      toast.success("File cleared");
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!audioFile) {
+      toast.warning("Please select a file first.");
+      return;
+    }
+
+    console.log("Uploading:", audioFile);
+    toast("Uploading started", {
+      description: audioFile.name,
+      action: {
+        label: "Cancel",
+        onClick: () => {
+          setAudioFile(null);
+          toast.info("Upload cancelled");
+        },
+      },
+    });
+  };
+
   return (
     <Card className="min-w-[350px] w-full max-w-md">
       <CardHeader className={"pb-3"}>
@@ -21,14 +73,20 @@ export function CardWithForm() {
           Upload your audio and get transcription
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent className={""}>
-        <form>
+        <form onSubmit={handleSubmit}>
           <div className="grid w-full gap-4">
-            <InputFile />
+            <InputFile
+              inputRef={inputRef}
+              value={audioFile}
+              onChange={handleFileChange}
+            />
 
             <div className="flex justify-between">
-              <Button type="button" variant="outline">Cancel</Button>
+              <Button onClick={handleClearFile} type="button" variant="outline">
+                Cancel
+              </Button>
               <Button type="submit">Upload</Button>
             </div>
           </div>
